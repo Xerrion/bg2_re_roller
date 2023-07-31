@@ -21,7 +21,8 @@ jobs:
         curl -sSL https://install.python-poetry.org | python -
     - name: Configure Poetry
       run: |
-        poetry config virtualenvs.create false
+        poetry config virtualenvs.create true --local
+        poetry config virtualenvs.in-project true --local
     - name: Install dependencies
       run: |
         poetry install
