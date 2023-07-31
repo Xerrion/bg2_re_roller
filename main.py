@@ -16,7 +16,7 @@ STORE_TEMPLATE = "assets/store.png"
 TESSERACT_CONFIG = "--psm 6 -c tessedit_char_whitelist=0123456789"
 ROI_X_OFFSET = 385
 ROI_Y_OFFSET = 610
-ROI_WIDTH = 40
+ROI_WIDTH = 25
 ROI_HEIGHT = 25
 GAME_WINDOW_TITLE = "Baldur's Gate II - Enhanced Edition"
 
