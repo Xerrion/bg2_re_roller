@@ -8,23 +8,25 @@ import keyboard
 import numpy as np
 import pyautogui
 import pytesseract
+from pygetwindow import Win32Window
 
 # Constants
-ROLLS_FILE = "max_roll.txt"
-REROLL_TEMPLATE = "assets/reroll.png"
-STORE_TEMPLATE = "assets/store.png"
-TESSERACT_CONFIG = "--psm 6 -c tessedit_char_whitelist=0123456789"
-ROI_X_OFFSET = 385
-ROI_Y_OFFSET = 610
-ROI_WIDTH = 40
-ROI_HEIGHT = 25
-GAME_WINDOW_TITLE = "Baldur's Gate II - Enhanced Edition"
+DEBUG: bool = False
+ROLLS_FILE: str = "max_roll.txt"
+REROLL_TEMPLATE: str = "assets/reroll.png"
+STORE_TEMPLATE: str = "assets/store.png"
+TESSERACT_CONFIG: str = "--psm 6 -c tessedit_char_whitelist=0123456789"
+ROI_X_OFFSET: int = 385
+ROI_Y_OFFSET: int = 610
+ROI_WIDTH: int = 40
+ROI_HEIGHT: int = 25
+GAME_WINDOW_TITLE: str = "Baldur's Gate II - Enhanced Edition"
 
 # Setup logging with timestamp, log level and message
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
 
-def get_game_window():
+def get_game_window() -> Win32Window:
     """
     Function to find and return the game window.
     """
@@ -48,7 +50,7 @@ def load_rolls():
         return []
 
 
-def find_template(image, template):
+def find_template(image, template) -> tuple:
     """
     Function to find the location of a template within an image.
     """
@@ -58,7 +60,7 @@ def find_template(image, template):
     return max_loc
 
 
-def extract_roll(roi):
+def extract_roll(roi) -> int | None:
     """
     Function to extract roll value from a region of interest (ROI).
     """
@@ -70,35 +72,43 @@ def extract_roll(roi):
         return None
 
 
+def debug_screenshot(roi, roll):
+    # Print the ROI for debugging
+    print("ROI shape: ", roi.shape)
+    print("Roll: ", roll)
+    cv2.imshow("ROI", roi)
+    cv2.waitKey(0)
+
+
 def main():
     """
     Main function to automate the game.
     """
-    window = get_game_window()
-    rolls = load_rolls()
+    window: Win32Window = get_game_window()
+    rolls: list = load_rolls()
 
     window_x, window_y = window.left, window.top
 
     if not window.isActive:
         window.activate()
 
-    time.sleep(1)
+    time.sleep(0.2)
 
-    reroll_template = cv2.imread(REROLL_TEMPLATE, 0)
+    re_roll_template = cv2.imread(REROLL_TEMPLATE, 0)
     store_template = cv2.imread(STORE_TEMPLATE, 0)
 
-    screenshot = np.array(pyautogui.screenshot())
+    screenshot: np.ndarray = np.array(pyautogui.screenshot())
 
-    reroll_button_loc = find_template(screenshot, reroll_template)
-    reroll_button_x = reroll_button_loc[0] + int(reroll_template.shape[1] / 2)
-    reroll_button_y = reroll_button_loc[1] + int(reroll_template.shape[0] / 2)
+    re_roll_button_loc: tuple = find_template(screenshot, re_roll_template)
+    re_roll_button_x: int = re_roll_button_loc[0] + int(re_roll_template.shape[1] / 2)
+    re_roll_button_y: int = re_roll_button_loc[1] + int(re_roll_template.shape[0] / 2)
 
-    store_button_loc = find_template(screenshot, store_template)
-    store_button_x = store_button_loc[0] + int(store_template.shape[1] / 2)
-    store_button_y = store_button_loc[1] + int(store_template.shape[0] / 2)
+    store_button_loc: tuple = find_template(screenshot, store_template)
+    store_button_x: int = store_button_loc[0] + int(store_template.shape[1] / 2)
+    store_button_y: int = store_button_loc[1] + int(store_template.shape[0] / 2)
 
-    roi_x = window_x + ROI_X_OFFSET
-    roi_y = window_y + ROI_Y_OFFSET
+    roi_x: int = window_x + ROI_X_OFFSET
+    roi_y: int = window_y + ROI_Y_OFFSET
 
     while True:
         # Check if the CTRL + SPACE keys are pressed to exit the loop
@@ -106,14 +116,19 @@ def main():
             break
 
         # Click the re-roll button
-        pyautogui.click(reroll_button_x, reroll_button_y)
+        pyautogui.click(re_roll_button_x, re_roll_button_y)
 
         # Capture a screenshot for value extraction
-        screenshot = np.array(pyautogui.screenshot())
-        roi = screenshot[roi_y : roi_y + ROI_HEIGHT, roi_x : roi_x + ROI_WIDTH]
+        screenshot: np.ndarray = np.array(pyautogui.screenshot())
+        roi: np.ndarray = screenshot[roi_y : roi_y + ROI_HEIGHT, roi_x : roi_x + ROI_WIDTH]
 
         # Extract roll value
         roll = extract_roll(roi)
+
+        if DEBUG:
+            # Show the ROI for debugging
+            debug_screenshot(roi, roll)
+
         if roll is None:
             continue
 
@@ -130,6 +145,8 @@ def main():
             with open(ROLLS_FILE, "w") as f:
                 logging.info(f"Writing {roll} to max_roll.txt...")
                 f.write(str(roll))
+            # sleep for a bit to prevent clicking the re-roll button before the store button is clicked
+            time.sleep(0.5)
 
         rolls.append(roll)
         most_common_roll = Counter(rolls).most_common(1)[0][0]
