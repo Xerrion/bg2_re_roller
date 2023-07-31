@@ -29,6 +29,8 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", datefmt=
 def get_game_window() -> Win32Window:
     """
     Function to find and return the game window.
+
+    :return: The game window.
     """
     window = pyautogui.getWindowsWithTitle(GAME_WINDOW_TITLE)[0]
     if window:
@@ -41,6 +43,8 @@ def get_game_window() -> Win32Window:
 def load_max_roll() -> int:
     """
     Function to load previous max roll from a file.
+
+    :return: The previous max roll or 0 if the file does not exist.
     """
     try:
         with open(MAX_ROLL_FILE, "r") as f:
@@ -53,6 +57,10 @@ def load_max_roll() -> int:
 def find_template(image, template) -> tuple:
     """
     Function to find the location of a template within an image.
+
+    :param image: The image to search in.
+    :param template: The template to search for.
+    :return: The x and y coordinates of the template.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     result = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
@@ -60,32 +68,41 @@ def find_template(image, template) -> tuple:
     return max_loc
 
 
-def setup_roi_and_buttons(window_x, window_y) -> tuple:
+def setup_coordinates(window_x, window_y) -> tuple:
     """
     Function to setup the region of interest (ROI) and the re-roll and store buttons.
 
-    :param window_x:
-    :param window_y:
+    :param window_x: The x coordinate of the game window.
+    :param window_y: The y coordinate of the game window.
     :return: The x and y coordinates of the re-roll button, the ROI and the store button.
     """
+    # Load templates and screenshot
     re_roll_template = cv2.imread(REROLL_TEMPLATE, 0)
     store_template = cv2.imread(STORE_TEMPLATE, 0)
     screenshot: np.ndarray = np.array(pyautogui.screenshot())
+
+    # Find re-roll button and store button
     re_roll_button_loc: tuple = find_template(screenshot, re_roll_template)
     re_roll_button_x: int = re_roll_button_loc[0] + int(re_roll_template.shape[1] / 2)
     re_roll_button_y: int = re_roll_button_loc[1] + int(re_roll_template.shape[0] / 2)
     store_button_loc: tuple = find_template(screenshot, store_template)
     store_button_x: int = store_button_loc[0] + int(store_template.shape[1] / 2)
     store_button_y: int = store_button_loc[1] + int(store_template.shape[0] / 2)
+
+    # Calculate ROI coordinates
     roi_x: int = window_x + ROI_X_OFFSET
     roi_y: int = window_y + ROI_Y_OFFSET
 
+    # Return coordinates
     return re_roll_button_x, re_roll_button_y, roi_x, roi_y, store_button_x, store_button_y
 
 
 def extract_roll(roi) -> int | None:
     """
     Function to extract roll value from a region of interest (ROI).
+
+    :param roi: The region of interest (ROI) to extract the roll value from.
+    :return: The roll value as an integer or None if the roll value could not be extracted.
     """
     roll = pytesseract.image_to_string(roi, config=TESSERACT_CONFIG)
     try:
@@ -96,9 +113,17 @@ def extract_roll(roi) -> int | None:
 
 
 def debug_screenshot(roi, roll):
+    """
+    Function to show the ROI and roll value for debugging.
+    :param roi: The region of interest (ROI) to show.
+    :param roll: The roll value to show.
+    :return: None
+    """
     # Print the ROI for debugging
     print("ROI shape: ", roi.shape)
     print("Roll: ", roll)
+
+    # Show the ROI and roll value
     cv2.imshow("ROI", roi)
     cv2.waitKey(0)
 
@@ -124,7 +149,7 @@ def main():
     time.sleep(0.2)
 
     # Setup the ROI and buttons
-    re_roll_button_x, re_roll_button_y, roi_x, roi_y, store_button_x, store_button_y = setup_roi_and_buttons(
+    re_roll_button_x, re_roll_button_y, roi_x, roi_y, store_button_x, store_button_y = setup_coordinates(
         window_x, window_y
     )
 
