@@ -60,7 +60,14 @@ def find_template(image, template) -> tuple:
     return max_loc
 
 
-def setup_roi_and_buttons(window_x, window_y):
+def setup_roi_and_buttons(window_x, window_y) -> tuple:
+    """
+    Function to setup the region of interest (ROI) and the re-roll and store buttons.
+
+    :param window_x:
+    :param window_y:
+    :return: The x and y coordinates of the re-roll button, the ROI and the store button.
+    """
     re_roll_template = cv2.imread(REROLL_TEMPLATE, 0)
     store_template = cv2.imread(STORE_TEMPLATE, 0)
     screenshot: np.ndarray = np.array(pyautogui.screenshot())
@@ -72,6 +79,7 @@ def setup_roi_and_buttons(window_x, window_y):
     store_button_y: int = store_button_loc[1] + int(store_template.shape[0] / 2)
     roi_x: int = window_x + ROI_X_OFFSET
     roi_y: int = window_y + ROI_Y_OFFSET
+
     return re_roll_button_x, re_roll_button_y, roi_x, roi_y, store_button_x, store_button_y
 
 
