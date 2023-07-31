@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "bg2_reroller"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.9,<3.12"
 pyautogui = "^0.9.54"
 opencv-python = "^4.7.0.72"
 numpy = "^1.25.0"
