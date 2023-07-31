@@ -1,7 +1,3 @@
-Sure, here's a sample `README.md` for your project:
-
----
-
 # Auto Clicker for Baldur's Gate II
 
 This project is an automated script for the Baldur's Gate II game. The script automates the process of re-rolling character stats to get the maximum possible roll. It uses various libraries such as `pyautogui` for GUI automation, `cv2` for image processing, and `pytesseract` for optical character recognition.
