@@ -1,12 +1,13 @@
+import logging
 import sys
 import time
-import cv2
-import numpy as np
-import pytesseract
-import pyautogui
-import keyboard
 from collections import Counter
-import logging
+
+import cv2
+import keyboard
+import numpy as np
+import pyautogui
+import pytesseract
 
 # Constants
 ROLLS_FILE = "max_roll.txt"
