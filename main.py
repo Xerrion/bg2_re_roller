@@ -1,29 +1,55 @@
 import logging
 import sys
 import time
-from collections import Counter
 
 import cv2
-import keyboard
 import numpy as np
 import pyautogui
 import pytesseract
 from pygetwindow import Win32Window
+from pynput import keyboard
 
 # Constants
 DEBUG: bool = False
 MAX_ROLL_FILE: str = "max_roll.txt"
-REROLL_TEMPLATE: str = "assets/reroll.png"
+RE_ROLL_TEMPLATE: str = "assets/reroll.png"
 STORE_TEMPLATE: str = "assets/store.png"
 TESSERACT_CONFIG: str = "--psm 6 -c tessedit_char_whitelist=0123456789"
 ROI_X_OFFSET: int = 385
-ROI_Y_OFFSET: int = 610
-ROI_WIDTH: int = 40
-ROI_HEIGHT: int = 25
+ROI_Y_OFFSET: int = 615
+ROI_WIDTH: int = 35
+ROI_HEIGHT: int = 20
 GAME_WINDOW_TITLE: str = "Baldur's Gate II - Enhanced Edition"
 
 # Setup logging with timestamp, log level and message
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
+
+# Variable to store the exit request
+exit_requested = False
+
+# The key combination to check
+COMBINATION = {keyboard.Key.ctrl_l, keyboard.Key.space}
+
+# The currently active modifiers
+current_keys = set()
+
+
+def on_press(key):
+    if key in COMBINATION:
+        print("Key pressed: {}".format(key))
+        current_keys.add(key)
+
+        if COMBINATION.issubset(current_keys):
+            print("Exiting...")
+            global exit_requested
+            exit_requested = True
+
+
+def on_release(key):
+    try:
+        current_keys.remove(key)
+    except KeyError:
+        pass  # Deal with a key like shift being released
 
 
 def get_game_window() -> Win32Window:
@@ -49,6 +75,9 @@ def load_max_roll() -> int:
     try:
         with open(MAX_ROLL_FILE, "r") as f:
             return int(f.read())
+    except ValueError:
+        logging.error("Could not convert max_roll.txt to an integer. Starting with 0.")
+        return 0
     except FileNotFoundError:
         logging.warning("Could not find max_roll.txt. Starting with 0.")
         return 0
@@ -70,16 +99,17 @@ def find_template(image, template) -> tuple:
 
 def setup_coordinates(window_x, window_y) -> tuple:
     """
-    Function to setup the region of interest (ROI) and the re-roll and store buttons.
+    Function to set up the region of interest (ROI) and the re-roll and store buttons.
 
     :param window_x: The x coordinate of the game window.
     :param window_y: The y coordinate of the game window.
     :return: The x and y coordinates of the re-roll button, the ROI and the store button.
     """
     # Load templates and screenshot
-    re_roll_template = cv2.imread(REROLL_TEMPLATE, 0)
+    re_roll_template = cv2.imread(RE_ROLL_TEMPLATE, 0)
     store_template = cv2.imread(STORE_TEMPLATE, 0)
-    screenshot: np.ndarray = np.array(pyautogui.screenshot())
+    capture = pyautogui.screenshot()
+    screenshot: np.ndarray = np.array(capture)
 
     # Find re-roll button and store button
     re_roll_button_loc: tuple = find_template(screenshot, re_roll_template)
@@ -104,9 +134,12 @@ def extract_roll(roi) -> int | None:
     :param roi: The region of interest (ROI) to extract the roll value from.
     :return: The roll value as an integer or None if the roll value could not be extracted.
     """
-    roll = pytesseract.image_to_string(roi, config=TESSERACT_CONFIG)
     try:
+        roll = pytesseract.image_to_string(roi, config=TESSERACT_CONFIG)
         return int(roll)
+    except pytesseract.TesseractError:
+        logging.error("Tesseract failed to extract text from image. Skipping this roll.")
+        return None
     except ValueError:
         logging.warning("Could not convert roll to an integer. Skipping this roll.")
         return None
@@ -148,63 +181,52 @@ def main():
     # Wait for the window to be active
     time.sleep(0.2)
 
-    # Setup the ROI and buttons
+    # Set up the ROI and buttons
     re_roll_button_x, re_roll_button_y, roi_x, roi_y, store_button_x, store_button_y = setup_coordinates(
         window_x, window_y
     )
 
-    while True:
-        # Activate the game window again if it is not active
-        if not window.isActive:
-            window.activate()
-            time.sleep(0.2)
+    # Set up the listener
+    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
+        # Now you would put your main loop here
+        while not exit_requested:
+            # Capture a screenshot for value extraction
+            capture: np.ndarray = np.array(pyautogui.screenshot())
+            roi: np.ndarray = capture[roi_y : roi_y + ROI_HEIGHT, roi_x : roi_x + ROI_WIDTH]
 
-        # Check if the CTRL + SPACE keys are pressed to exit the loop
-        if keyboard.is_pressed("ctrl+space"):
-            break
+            # Extract roll value
+            roll = extract_roll(roi)
 
-        # Click the re-roll button
-        pyautogui.click(re_roll_button_x, re_roll_button_y)
+            time.sleep(1)
 
-        # Capture a screenshot for value extraction
-        screenshot: np.ndarray = np.array(pyautogui.screenshot())
-        roi: np.ndarray = screenshot[roi_y : roi_y + ROI_HEIGHT, roi_x : roi_x + ROI_WIDTH]
+            # If roll extraction failed, skip this roll
+            if roll is None:
+                continue
 
-        # Extract roll value
-        roll = extract_roll(roi)
+            logging.info(f"Current roll: {roll}")
 
-        if DEBUG:
-            # Show the ROI for debugging
-            debug_screenshot(roi, roll)
+            # If new roll is better, store it
+            if roll > max_roll:
+                # Click the store button
+                pyautogui.click(store_button_x, store_button_y, clicks=2, interval=0.1)
 
-        if roll is None:
-            continue
+                # Write the new max roll to a file
+                with open(MAX_ROLL_FILE, "w") as f:
+                    logging.info(f"Writing {roll} to max_roll.txt...")
+                    f.write(str(roll))
 
-        logging.info(f"Current max roll: {max_roll}")
-        logging.info(f"Current roll: {roll}")
+                # Update max roll
+                max_roll = roll
 
-        # If new roll is better, store it
-        if roll > max_roll:
-            # Update max roll
-            max_roll = roll
+            logging.info(f"Current max roll: {max_roll}")
 
-            logging.info(f"Found a new max roll: {roll}")
-            logging.info("Clicking the store button...")
+            # Exit if a good roll is found
+            if roll >= 100:
+                break
 
-            # Click the store button
-            pyautogui.click(store_button_x, store_button_y)
-
-            # Write the new max roll to a file
-            with open(MAX_ROLL_FILE, "w") as f:
-                logging.info(f"Writing {roll} to max_roll.txt...")
-                f.write(str(roll))
-
-            # Sleep for a bit to prevent clicking the re-roll button before the store button is clicked
-            time.sleep(0.5)
-
-        # Exit if a good roll is found
-        if roll >= 100:
-            break
+            # Click the re-roll button
+            pyautogui.click(re_roll_button_x, re_roll_button_y)
+        listener.stop()
 
 
 if __name__ == "__main__":

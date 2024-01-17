@@ -14,6 +14,7 @@ numpy = "^1.25.0"
 pytesseract = "^0.3.10"
 keyboard = "^0.13.5"
 pylint = "^2.17.5"
+pynput = "^1.7.6"
 
 
 [build-system]
